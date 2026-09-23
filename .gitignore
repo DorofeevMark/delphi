@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+.delphi/
+.models/
+third_party_staging/
+
+.python/
+.runtime/
