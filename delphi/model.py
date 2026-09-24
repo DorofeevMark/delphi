@@ -1,0 +1,63 @@
+import hashlib
+import json
+from pathlib import Path
+
+
+class Failure(Exception):
+    def __init__(self, code, message, exit_code=3):
+        super().__init__(message)
+        self.code = code
+        self.exit_code = exit_code
+
+
+def inspect_model(value):
+    if not value:
+        raise Failure("model_missing", "Supply --model /absolute/local/model or DELPHI_MODEL")
+    root = Path(value).expanduser().resolve()
+    if not root.is_dir() or not (root / "modules.json").is_file():
+        raise Failure("model_missing", f"Local SentenceTransformers assets missing: {root}")
+    modules = json.loads((root / "modules.json").read_text())
+    allowed = {"sentence_transformers.models.Transformer", "sentence_transformers.models.Pooling", "sentence_transformers.models.Normalize", "sentence_transformers.models.Dense"}
+    if not isinstance(modules, list) or not modules:
+        raise Failure("model_invalid", "modules.json must contain a nonempty module list")
+    for module in modules:
+        if module.get("type") not in allowed:
+            raise Failure("model_invalid", f"Unsupported model module: {module.get('type')}")
+        folder = (root / module.get("path", "")).resolve()
+        if not folder.is_relative_to(root) or (not folder.is_dir() and module["type"] != "sentence_transformers.models.Normalize"):
+            raise Failure("model_missing", "A model module directory is missing or outside the model")
+    if not list(root.rglob("*.safetensors")):
+        raise Failure("model_missing", "Model requires local safetensors weights; pickle weights are unsupported")
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if ".cache" in relative.parts or path.name in {"README.md", "LICENSE", "provenance.json"}:
+            continue
+        if path.is_file():
+            digest.update(relative.as_posix().encode() + b"\0")
+            with path.open("rb") as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(block)
+    return root, digest.hexdigest()
+
+
+def load_model(root):
+    from sentence_transformers import SentenceTransformer
+
+    try:
+        return SentenceTransformer(
+            str(root), device="cpu", local_files_only=True, trust_remote_code=False,
+            model_kwargs={"use_safetensors": True, "local_files_only": True},
+        )
+    except Exception as exc:
+        raise Failure("model_invalid", f"Cannot load local model assets at {root}: {exc}") from exc
+
+
+def embed(model, texts):
+    import numpy as np
+
+    result = model.encode(texts, normalize_embeddings=True, show_progress_bar=False, convert_to_numpy=True)
+    result = np.asarray(result, dtype=np.float32)
+    if not np.isfinite(result).all() or (np.linalg.norm(result, axis=-1) == 0).any():
+        raise Failure("embedding_invalid", "Model produced invalid or zero embeddings")
+    return result

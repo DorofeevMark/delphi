@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "delphi-local-code"
+version = "0.1.0"
+description = "Offline local code search for agents"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+dependencies = [
+  "cocoindex==1.0.24",
+  "sqlite-vec==0.1.9",
+  "sentence-transformers==6.1.0",
+  "numpy==2.5.3",
+  "pathspec==0.12.1",
+]
+
+[project.scripts]
+delphi = "delphi.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["delphi*"]
