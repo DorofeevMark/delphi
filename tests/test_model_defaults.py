@@ -21,7 +21,7 @@ class ModelDefaults(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
             source = root / "source/delphi/model.py"
-            prefix = root / "installed/venv"
+1            prefix = root / "installed/.venv"
             user_model = root / "home/.local/share/delphi/models/all-MiniLM-L6-v2"
             with patch("delphi.model.__file__", str(source)), patch.object(sys, "prefix", str(prefix)), patch("delphi.model.Path.home", return_value=root / "home"):
                 self.assertEqual(default_model(), user_model)
