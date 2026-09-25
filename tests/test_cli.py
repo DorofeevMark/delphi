@@ -3,7 +3,6 @@ import hashlib
 import fcntl
 import os
 from pathlib import Path
-import socket
 import subprocess
 import sys
 import tempfile
@@ -127,9 +126,18 @@ class OfflineCLI(unittest.TestCase):
 class NetworkSandbox(unittest.TestCase):
     @unittest.skipUnless(os.environ.get("DELPHI_OS_SANDBOX") == "1", "Run via scripts/test_offline.sh")
     def test_os_denies_network(self):
-        with socket.socket() as sock:
-            with self.assertRaises(PermissionError):
-                sock.connect(("127.0.0.1", 9))
+        probe = subprocess.run(
+            [sys.executable, "-c",
+             "import socket, sys\n"
+             "with socket.socket() as sock:\n"
+             "    try:\n"
+             "        sock.connect(('127.0.0.1', 9))\n"
+             "    except PermissionError:\n"
+             "        sys.exit(0)\n"
+             "    raise RuntimeError('OS network denial is not active')\n"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(probe.returncode, 0, probe.stderr)
 
 
 if __name__ == "__main__":

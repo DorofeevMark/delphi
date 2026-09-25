@@ -25,7 +25,7 @@ def arguments():
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("index", "search", "status", "doctor"):
         command = commands.add_parser(name)
-        command.add_argument("--project", type=Path, default=Path.cwd())
+        command.add_argument("--project", "-p", default=str(Path.cwd()), help="Project path or unique indexed folder name")
         if name != "status":
             command.add_argument("--model", default=os.environ.get("DELPHI_MODEL") or default_model())
         if name in {"index", "search"}:
@@ -40,13 +40,38 @@ def arguments():
     return parser.parse_args()
 
 
-def index_directory(project):
+def index_root():
     root = Path(__file__).resolve().parent.parent
     if root.name in {"site-packages", "dist-packages"}:
         root = Path(sys.prefix).resolve().parent
-    storage = Path(os.environ.get("DELPHI_INDEX_ROOT") or root / ".delphi/indexes").expanduser().resolve()
+    return Path(os.environ.get("DELPHI_INDEX_ROOT") or root / ".delphi/indexes").expanduser().resolve()
+
+
+def index_directory(project):
     identity = hashlib.sha256(os.fsencode(project.resolve())).hexdigest()
-    return storage / identity
+    return index_root() / identity
+
+
+def resolve_project(value):
+    raw = str(value)
+    if raw not in {".", ".."} and "/" not in raw and not raw.startswith("~"):
+        matches = set()
+        for manifest in index_root().glob("*/manifest.json"):
+            try:
+                info = json.loads(manifest.read_text())
+            except (OSError, ValueError):
+                continue
+            if not isinstance(info, dict) or not isinstance(info.get("project"), str):
+                continue
+            project = Path(info["project"])
+            if project.is_absolute() and project.name == raw and index_directory(project) == manifest.parent:
+                matches.add(project.resolve())
+        if len(matches) > 1:
+            choices = ", ".join(str(path) for path in sorted(matches))
+            raise Failure("project_ambiguous", f"Multiple indexed projects named {raw}: {choices}. Use an explicit path.", 2)
+        if matches:
+            return matches.pop()
+    return Path(value).expanduser().resolve()
 
 
 @contextmanager
@@ -103,7 +128,7 @@ def counts(state):
 
 
 def execute(args):
-    project = args.project.expanduser().resolve()
+    project = resolve_project(args.project)
     if not project.is_dir():
         raise Failure("project_missing", f"Project directory does not exist: {project}", 2)
     state = index_directory(project)
