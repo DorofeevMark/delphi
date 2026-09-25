@@ -9,10 +9,10 @@ The tested target is macOS arm64, with CPython 3.12 supporting SQLite loadable e
 Prepare dependencies and model assets on a network-enabled machine before entering the sandbox:
 
 ```sh
-python3 -m venv .runtime
-.runtime/bin/python -m pip install -r requirements-lock.txt
-.runtime/bin/python -m pip install --no-deps --no-build-isolation .
-.runtime/bin/python scripts/prepare_model.py .models/all-MiniLM-L6-v2
+python3 -m venv venv
+venv/bin/python -m pip install -r requirements-lock.txt
+venv/bin/python -m pip install --no-deps --no-build-isolation .
+venv/bin/python scripts/prepare_model.py .models/all-MiniLM-L6-v2
 ```
 
 Use a Python build with extension loading enabled for the first command (a uv-managed Python is one option). `requirements-lock.txt` records the tested environment's exact versions; it is a version freeze, not a wheel hash lock or cross-platform lock. For an air-gapped deployment, prepare a wheelhouse for the target Python/OS and install it with `pip --no-index --find-links=/path/to/wheelhouse`. Distribute the complete model directory separately, including its license, model card, and provenance manifest. Model preparation and supplemental release-notice preparation use the network; neither is imported by the runtime.
@@ -20,15 +20,14 @@ Use a Python build with extension loading enabled for the first command (a uv-ma
 ## Commands
 
 ```sh
-export DELPHI_MODEL="$PWD/.models/all-MiniLM-L6-v2"
-.runtime/bin/python -m delphi doctor --project /path/to/project
-.runtime/bin/python -m delphi index --project /path/to/project
-.runtime/bin/python -m delphi search --project /path/to/project 'where are user passwords checked?'
-.runtime/bin/python -m delphi search --project /path/to/project 'parse configuration' --language python --path 'src/*' --limit 5
-.runtime/bin/python -m delphi status --project /path/to/project
+venv/bin/python -m delphi doctor --project /path/to/project
+venv/bin/python -m delphi index --project /path/to/project
+venv/bin/python -m delphi search --project /path/to/project 'where are user passwords checked?'
+venv/bin/python -m delphi search --project /path/to/project 'parse configuration' --language python --path 'src/*' --limit 5
+venv/bin/python -m delphi status --project /path/to/project
 ```
 
-An installed package also provides `delphi`. `--model /absolute/local/model` overrides `DELPHI_MODEL`. `status` needs no model. Paths are resolved relative to the current working directory; the project root is explicit and is not inferred from Git.
+An installed package also provides `delphi`. `--model /absolute/local/model` overrides `DELPHI_MODEL`. Without either, Delphi looks for `.models/all-MiniLM-L6-v2` beside the source package, then beside the virtual environment, then `~/.local/share/delphi/models/all-MiniLM-L6-v2`. The first existing directory is used and validated; incomplete assets fail clearly without downloading anything. Discovery is independent of the working directory and `--project`. The prepared model in this checkout is found automatically. `status` needs no model. Paths are resolved relative to the current working directory; the project root is explicit and is not inferred from Git.
 
 Each command writes one JSON object to stdout, with `schema_version`, `ok`, `command`, and either `data` or `error`. Library progress and diagnostics go to stderr. Argument help uses normal text. Exit codes: 0 success (including no search matches), 2 invalid arguments/project, 3 missing/incompatible model or runtime assets, 4 missing/incomplete/incompatible index, 5 busy index or operational failure. Search results contain project-relative paths, language, inclusive 1-based line ranges, original chunk text, Euclidean distance, and cosine similarity score. Lower distance and higher score mean closer matches; scores are not probabilities. Equal distances use stable path/line/id ordering.
 
@@ -40,7 +39,7 @@ A Python audit guard rejects Internet socket operations and DNS resolution. For 
 
 ```sh
 /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \
-  .runtime/bin/python -m delphi index --project /path/to/project --model "$DELPHI_MODEL"
+  venv/bin/python -m delphi index --project /path/to/project
 ```
 
 The audit guard is defense in depth, not a replacement for OS isolation. In this session, Codex’s own filesystem sandbox denied CocoIndex native storage initialization with `EPERM`; the dedicated macOS profile above successfully ran indexing with all networking denied. `doctor` probes native storage and reports `sandbox_storage_denied` for the stricter environment. Launching that dedicated profile from Codex requires its tool approval; the application does not escalate itself. The CLI uses local filesystem access, threads, SQLite extensions, and CocoIndex's LMDB memory maps. It needs read access to source and model files and write access to the project's `.delphi` directory. No network permission is needed. `doctor` probes CocoIndex storage, then runs an actual local embedding and sqlite-vec distance calculation; it reports the Python guard, not a claim that an external OS sandbox is active.

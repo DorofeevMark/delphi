@@ -11,7 +11,7 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 
-from .model import Failure, embed, inspect_model, load_model
+from .model import Failure, default_model, embed, inspect_model, load_model
 
 
 class Parser(argparse.ArgumentParser):
@@ -26,7 +26,7 @@ def arguments():
         command = commands.add_parser(name)
         command.add_argument("--project", type=Path, default=Path.cwd())
         if name != "status":
-            command.add_argument("--model", default=os.environ.get("DELPHI_MODEL"))
+            command.add_argument("--model", default=os.environ.get("DELPHI_MODEL") or default_model())
         if name in {"index", "search"}:
             command.add_argument("--path", action="append", default=[], help="Project-relative glob; repeat for alternatives")
             command.add_argument("--language", action="append", default=[])
