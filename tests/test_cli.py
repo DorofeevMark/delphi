@@ -43,8 +43,10 @@ class OfflineCLI(unittest.TestCase):
     def tearDownClass(cls):
         cls.workspace.cleanup()
 
-    def invoke(self, *args, code=0, model=MODEL):
-        command = [sys.executable, "-m", "delphi", *args, "--project", str(self.project)]
+    def invoke(self, *args, code=0, model=MODEL, project=True):
+        command = [sys.executable, "-m", "delphi", *args]
+        if project:
+            command.extend(["--project", str(self.project)])
         if args[0] != "status":
             command.extend(["--model", str(model)])
         result = subprocess.run(command, env=self.env, text=True, capture_output=True, timeout=120)
@@ -80,6 +82,10 @@ class OfflineCLI(unittest.TestCase):
         self.assertFalse((self.project / ".delphi").exists())
         results = self.invoke("search", "verify user password", "--language", "python", "--limit", "1")["results"]
         self.assertEqual(results[0]["path"], "auth.py")
+        across = self.invoke("search", "verify user password", "--limit", "1", project=False)
+        self.assertEqual(across["projects"], [str(self.project)])
+        self.assertEqual(across["results"][0]["project"], str(self.project))
+        self.assertEqual(across["results"][0]["path"], "auth.py")
         self.assertEqual(results[0]["start_line"], 1)
         self.assertEqual(results[0]["end_line"], 2)
         repeated = self.invoke("index")

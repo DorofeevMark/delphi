@@ -25,7 +25,7 @@ def arguments():
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("index", "search", "status", "doctor"):
         command = commands.add_parser(name)
-        command.add_argument("--project", "-p", default=str(Path.cwd()), help="Project path or unique indexed folder name")
+        command.add_argument("--project", "-p", default=None if name == "search" else str(Path.cwd()), help="Project path or indexed name; search defaults to all indexes")
         if name != "status":
             command.add_argument("--model", default=os.environ.get("DELPHI_MODEL") or default_model())
         if name in {"index", "search"}:
@@ -128,6 +128,10 @@ def counts(state):
 
 
 def execute(args):
+    if args.command == "search" and (not args.query.strip() or not 1 <= args.limit <= 1000):
+        raise Failure("usage", "Query must be nonempty and --limit must be between 1 and 1000", 2)
+    if args.command == "search" and args.project is None:
+        return search_all(args)
     project = resolve_project(args.project)
     if not project.is_dir():
         raise Failure("project_missing", f"Project directory does not exist: {project}", 2)
@@ -136,8 +140,6 @@ def execute(args):
         with locked(state, False):
             info = metadata(state)
             return {"project": str(project), "index_directory": str(state), **info, **(counts(state) if info["ready"] else {})}
-    if args.command == "search" and (not args.query.strip() or not 1 <= args.limit <= 1000):
-        raise Failure("usage", "Query must be nonempty and --limit must be between 1 and 1000", 2)
     if args.command == "index" and args.max_bytes < 1:
         raise Failure("usage", "--max-bytes must be positive", 2)
     model_path, identity = inspect_model(args.model)
@@ -194,26 +196,60 @@ def execute(args):
             raise Failure("index_incomplete", "Last index did not complete; run index again before searching", 4)
         model = load_model(model_path)
         vector = embed(model, [args.query])[0].tobytes()
-        conditions, parameters = [], [vector]
-        if args.language:
-            conditions.append("language IN (" + ",".join("?" for _ in args.language) + ")")
-            parameters.extend(args.language)
-        if args.path:
-            conditions.append("(" + " OR ".join("path_matches(path, ?)" for _ in args.path) + ")")
-            parameters.extend(args.path)
-        where = " WHERE " + " AND ".join(conditions) if conditions else ""
-        with database(state / "vectors.sqlite") as db:
-            import fnmatch
+        return {"project": str(project), "index_directory": str(state), "query": args.query,
+                "results": search_rows(state, args, vector)}
 
-            db.create_function("path_matches", 2, fnmatch.fnmatchcase, deterministic=True)
-            rows = db.execute(
-                "SELECT path, language, text, start_line, end_line, vec_distance_L2(vector, ?) AS distance "
-                "FROM passages" + where + " ORDER BY distance, path, start_line, id LIMIT ?",
-                [*parameters, args.limit],
-            ).fetchall()
-        return {"project": str(project), "index_directory": str(state), "query": args.query, "results": [
-            {**dict(row), "score": max(-1.0, min(1.0, 1.0 - row["distance"] ** 2 / 2.0))} for row in rows
-        ]}
+
+def search_rows(state, args, vector):
+    conditions, parameters = [], [vector]
+    if args.language:
+        conditions.append("language IN (" + ",".join("?" for _ in args.language) + ")")
+        parameters.extend(args.language)
+    if args.path:
+        conditions.append("(" + " OR ".join("path_matches(path, ?)" for _ in args.path) + ")")
+        parameters.extend(args.path)
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    with database(state / "vectors.sqlite") as db:
+        import fnmatch
+
+        db.create_function("path_matches", 2, fnmatch.fnmatchcase, deterministic=True)
+        rows = db.execute(
+            "SELECT path, language, text, start_line, end_line, vec_distance_L2(vector, ?) AS distance "
+            "FROM passages" + where + " ORDER BY distance, path, start_line, id LIMIT ?",
+            [*parameters, args.limit],
+        ).fetchall()
+    return [
+        {**dict(row), "score": max(-1.0, min(1.0, 1.0 - row["distance"] ** 2 / 2.0))} for row in rows
+    ]
+
+
+def search_all(args):
+    states = sorted(path for path in index_root().glob("*") if path.is_dir())
+    if not states:
+        raise Failure("index_missing", "No indexes exist; run index --project /path/to/code first", 4)
+    model_path, identity = inspect_model(args.model)
+    if not hasattr(sqlite3.Connection, "enable_load_extension"):
+        raise Failure("sqlite_extensions_unavailable", "This Python disables SQLite extension loading; provision a Python build with loadable SQLite extensions", 3)
+    model = load_model(model_path)
+    vector = embed(model, [args.query])[0].tobytes()
+    results, projects = [], []
+    for state in states:
+        try:
+            with locked(state, False):
+                info = metadata(state)
+                project = Path(info.get("project", ""))
+                if not project.is_absolute() or index_directory(project) != state:
+                    raise Failure("index_incompatible", "Index has no valid project identity", 4)
+                if not info.get("ready"):
+                    raise Failure("index_incomplete", "Last index did not complete; run index again", 4)
+                if info.get("model_sha256") != identity:
+                    raise Failure("model_mismatch", "Index uses different model assets; select a compatible project with --project", 4)
+                results.extend({**row, "project": str(project)} for row in search_rows(state, args, vector))
+                projects.append(str(project))
+        except Failure as exc:
+            raise Failure(exc.code, f"{state}: {exc}", exc.exit_code) from exc
+    results.sort(key=lambda row: (row["distance"], row["project"], row["path"], row["start_line"], row["end_line"], row["text"]))
+    return {"project": None, "projects": sorted(projects), "query": args.query, "results": results[:args.limit]}
 
 
 def main():
