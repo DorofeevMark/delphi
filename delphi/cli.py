@@ -2,6 +2,7 @@ import argparse
 import asyncio
 from contextlib import contextmanager, redirect_stdout
 import fcntl
+import hashlib
 from importlib.metadata import version
 import json
 import os
@@ -39,6 +40,15 @@ def arguments():
     return parser.parse_args()
 
 
+def index_directory(project):
+    root = Path(__file__).resolve().parent.parent
+    if root.name in {"site-packages", "dist-packages"}:
+        root = Path(sys.prefix).resolve().parent
+    storage = Path(os.environ.get("DELPHI_INDEX_ROOT") or root / ".delphi/indexes").expanduser().resolve()
+    identity = hashlib.sha256(os.fsencode(project.resolve())).hexdigest()
+    return storage / identity
+
+
 @contextmanager
 def database(path):
     import sqlite_vec
@@ -57,7 +67,7 @@ def database(path):
 @contextmanager
 def locked(state, exclusive):
     if exclusive:
-        state.mkdir(exist_ok=True)
+        state.mkdir(parents=True, exist_ok=True)
     if not state.is_dir():
         raise Failure("index_missing", "No index exists; run index first", 4)
     try:
@@ -96,11 +106,11 @@ def execute(args):
     project = args.project.expanduser().resolve()
     if not project.is_dir():
         raise Failure("project_missing", f"Project directory does not exist: {project}", 2)
-    state = project / ".delphi"
+    state = index_directory(project)
     if args.command == "status":
         with locked(state, False):
             info = metadata(state)
-            return {"project": str(project), **info, **(counts(state) if info["ready"] else {})}
+            return {"project": str(project), "index_directory": str(state), **info, **(counts(state) if info["ready"] else {})}
     if args.command == "search" and (not args.query.strip() or not 1 <= args.limit <= 1000):
         raise Failure("usage", "Query must be nonempty and --limit must be between 1 and 1000", 2)
     if args.command == "index" and args.max_bytes < 1:
@@ -127,7 +137,7 @@ def execute(args):
         finally:
             db.close()
         return {
-            "project": str(project), "model": str(model_path), "model_sha256": identity,
+            "project": str(project), "index_directory": str(state), "model": str(model_path), "model_sha256": identity,
             "dimensions": len(vector), "self_distance": distance, "device": "cpu",
             "cocoindex_storage": "ok", "offline": True, "network_guard": "python_audit", "sqlite": sqlite3.sqlite_version,
             "dependencies": {name: version(name) for name in ("cocoindex", "sqlite-vec", "sentence-transformers", "torch")},
@@ -135,7 +145,7 @@ def execute(args):
     with locked(state, args.command == "index"):
         previous = metadata(state) if (state / "manifest.json").exists() else None
         if previous and previous["model_sha256"] != identity:
-            raise Failure("model_mismatch", "Model assets differ from the index; restore the original model or move .delphi aside and reindex", 4)
+            raise Failure("model_mismatch", f"Model assets differ from the index; restore the original model or move {state} aside and reindex", 4)
         if args.command == "index":
             from .files import collect
             from .indexing import run
@@ -143,7 +153,7 @@ def execute(args):
             model = load_model(model_path)
             sources, skipped = collect(project, args.path, args.language, args.ignore, model_path, args.max_bytes)
             info = {
-                "schema_version": 1, "ready": False, "model": str(model_path), "model_sha256": identity,
+                "schema_version": 1, "project": str(project), "ready": False, "model": str(model_path), "model_sha256": identity,
                 "paths": args.path, "languages": args.language, "ignores": args.ignore,
                 "max_bytes": args.max_bytes,
             }
@@ -152,7 +162,7 @@ def execute(args):
             info.update(ready=True, indexed_at=datetime.now(timezone.utc).isoformat())
             total = counts(state)
             write_metadata(state, info)
-            return {"project": str(project), **total, "skipped": skipped, "incremental": stats}
+            return {"project": str(project), "index_directory": str(state), **total, "skipped": skipped, "incremental": stats}
         if previous is None:
             raise Failure("index_missing", "Run index first", 4)
         if not previous["ready"]:
@@ -176,7 +186,7 @@ def execute(args):
                 "FROM passages" + where + " ORDER BY distance, path, start_line, id LIMIT ?",
                 [*parameters, args.limit],
             ).fetchall()
-        return {"project": str(project), "query": args.query, "results": [
+        return {"project": str(project), "index_directory": str(state), "query": args.query, "results": [
             {**dict(row), "score": max(-1.0, min(1.0, 1.0 - row["distance"] ** 2 / 2.0))} for row in rows
         ]}
 

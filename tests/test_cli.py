@@ -1,4 +1,5 @@
 import json
+import hashlib
 import fcntl
 import os
 from pathlib import Path
@@ -17,9 +18,11 @@ class OfflineCLI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.workspace = tempfile.TemporaryDirectory(prefix="delphi-test-")
-        cls.base = Path(cls.workspace.name)
+        cls.base = Path(cls.workspace.name).resolve()
         cls.project = cls.base / "project"
         cls.project.mkdir()
+        cls.index_root = cls.base / "indexes"
+        cls.state = cls.index_root / hashlib.sha256(os.fsencode(cls.project.resolve())).hexdigest()
         cls.audit = cls.base / "audit"
         cls.audit.mkdir()
         (cls.audit / "sitecustomize.py").write_text(
@@ -34,7 +37,7 @@ class OfflineCLI(unittest.TestCase):
         )
         cls.network_log = cls.base / "network.log"
         cls.env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(cls.audit), str(ROOT)]),
-                       HF_HOME=str(cls.base / "empty-hf-cache"), DELPHI_NETWORK_LOG=str(cls.network_log),
+                       DELPHI_INDEX_ROOT=str(cls.index_root), HF_HOME=str(cls.base / "empty-hf-cache"), DELPHI_NETWORK_LOG=str(cls.network_log),
                        COCOINDEX_DISABLE_USAGE_TRACKING="0", HF_HUB_OFFLINE="0", HF_HUB_DISABLE_TELEMETRY="0")
 
     @classmethod
@@ -74,6 +77,8 @@ class OfflineCLI(unittest.TestCase):
         (self.project / "linked.py").symlink_to(self.project / "auth.py")
         initial = self.invoke("index")
         self.assertGreaterEqual(initial["files"], 3)
+        self.assertEqual(initial["index_directory"], str(self.state))
+        self.assertFalse((self.project / ".delphi").exists())
         results = self.invoke("search", "verify user password", "--language", "python", "--limit", "1")["results"]
         self.assertEqual(results[0]["path"], "auth.py")
         self.assertEqual(results[0]["start_line"], 1)
@@ -97,11 +102,11 @@ class OfflineCLI(unittest.TestCase):
         self.assertEqual(self.invoke("search", "excluded", "--path", "nested/hide.private")["results"], [])
         self.assertEqual(len(self.invoke("search", "retained", "--path", "nested/keep.private")["results"]), 1)
         self.assertTrue(self.invoke("status")["ready"])
-        with (self.project / ".delphi/lock").open("r") as lock:
+        with (self.state / "lock").open("r") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.assertEqual(self.invoke("status", code=5)["code"], "index_busy")
             self.assertEqual(self.invoke("search", "token", code=5)["code"], "index_busy")
-        manifest = self.project / ".delphi/manifest.json"
+        manifest = self.state / "manifest.json"
         incomplete = json.loads(manifest.read_text())
         incomplete["ready"] = False
         manifest.write_text(json.dumps(incomplete))
