@@ -89,11 +89,23 @@ Each target project has one index in `<user-data>/delphi/indexes/<sha256-of-reso
 
 ## Verification and provenance
 
+Run the 23 regular tests from the checkout root:
+
+```sh
+bash scripts/test.sh
+```
+
+These cover setup logic, project resolution, storage paths, model defaults, and cross-project ranking with real SQLite and mocked embeddings. They need installed dependencies, but no prepared model or OS network sandbox. They make no external requests; importing Delphi still installs its normal Python network guard. Plain `.venv/bin/python -m unittest discover -s tests -v` runs this same suite.
+
+Run the 3 offline integration tests separately on macOS with a prepared model:
+
 ```sh
 export DELPHI_TEST_MODEL="$HOME/Library/Application Support/delphi/models/all-MiniLM-L6-v2"
 bash scripts/test_offline.sh
 ```
 
-The suite launches real CLI subprocesses under OS network denial, uses an empty Hugging Face cache, and records Python DNS/connect attempts before runtime imports. It covers missing models, doctor, actual retrieval, same-content reuse, preserved-mtime edits, deletion, ignore negation, filters, line numbers, empty results, and JSON/exit codes. A separate socket probe verifies the OS blocks networking.
+Set `DELPHI_TEST_MODEL` to the actual model location; a model prepared inside this checkout can instead use `export DELPHI_TEST_MODEL="$PWD/.models/all-MiniLM-L6-v2"`. Both scripts accept `DELPHI_PYTHON` to select a different Python executable.
+
+The separate `tests/offline` suite launches real CLI subprocesses under OS network denial, uses an empty Hugging Face cache, and records Python DNS/connect attempts before runtime imports. It covers offline model import/reuse, missing models, doctor, actual retrieval, same-content reuse, preserved-mtime edits, deletion, ignore negation, filters, line numbers, empty results, and JSON/exit codes. A separate socket probe verifies the OS blocks networking. This directory is intentionally outside regular unittest discovery. Run both commands for the full 26-test check; neither suite tests live model downloads.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency/model provenance and redistribution notes. The application package does not bundle dependencies or model weights. For a bundled release, run `scripts/collect_notices.py` in the release environment and `scripts/prepare_notices.py` during online preparation to collect notices under `build/third_party/`; review and include them with that release. The model asset hashes are retained in `MODEL_PROVENANCE.json`.
