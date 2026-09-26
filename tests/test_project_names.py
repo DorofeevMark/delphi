@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from delphi.cli import index_directory, resolve_project
-from delphi.model import Failure
+from delphi_code.cli import index_directory, resolve_project
+from delphi_code.model import Failure
 
 
 class ProjectNames(unittest.TestCase):
@@ -14,7 +14,7 @@ class ProjectNames(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
-        self.environment = patch.dict(os.environ, {"DELPHI_INDEX_ROOT": str(self.root / "indexes")})
+        self.environment = patch.dict(os.environ, {"DELPHI_CODE_INDEX_ROOT": str(self.root / "indexes")})
         self.environment.start()
         self.addCleanup(self.environment.stop)
 

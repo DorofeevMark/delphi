@@ -4,8 +4,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from delphi.cli import index_directory, locked
-from delphi.paths import data_directory
+from delphi_code.cli import index_directory, locked
+from delphi_code.paths import data_directory
 
 
 class IndexDirectory(unittest.TestCase):
@@ -17,7 +17,7 @@ class IndexDirectory(unittest.TestCase):
     def test_projects_with_same_name_are_separate(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
-            with patch.dict(os.environ, {'DELPHI_INDEX_ROOT': str(root / 'indexes')}):
+            with patch.dict(os.environ, {'DELPHI_CODE_INDEX_ROOT': str(root / 'indexes')}):
                 first = index_directory(root / 'one/project')
                 second = index_directory(root / 'two/project')
                 self.assertNotEqual(first, second)

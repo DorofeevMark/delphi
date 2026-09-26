@@ -57,7 +57,7 @@ async def run(state, sources, model, identity):
     connection = sqlite.connect(state / "vectors.sqlite", load_vec=True)
     provider.provide(DATABASE, connection)
     environment = storage_environment(state, provider)
-    app = coco.App(coco.AppConfig(name="delphi", environment=environment), build, sources, identity, model.get_embedding_dimension())
+    app = coco.App(coco.AppConfig(name="delphi-code", environment=environment), build, sources, identity, model.get_embedding_dimension())
     handle = app.update()
     await handle
     stats = handle.stats()

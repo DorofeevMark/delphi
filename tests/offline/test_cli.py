@@ -9,14 +9,14 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-MODEL = os.environ.get("DELPHI_TEST_MODEL")
+MODEL = os.environ.get("DELPHI_CODE_TEST_MODEL")
 
 
-@unittest.skipUnless(MODEL, "Set DELPHI_TEST_MODEL to a provisioned local model")
+@unittest.skipUnless(MODEL, "Set DELPHI_CODE_TEST_MODEL to a provisioned local model")
 class OfflineCLI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.workspace = tempfile.TemporaryDirectory(prefix="delphi-test-")
+        cls.workspace = tempfile.TemporaryDirectory(prefix="delphi-code-test-")
         cls.base = Path(cls.workspace.name).resolve()
         cls.project = cls.base / "project"
         cls.project.mkdir()
@@ -29,14 +29,14 @@ class OfflineCLI(unittest.TestCase):
             "def audit(event, args):\n"
             "    if event in {'socket.connect', 'socket.getaddrinfo', 'socket.gethostbyname', 'socket.gethostbyaddr', 'socket.sendto'}:\n"
             "        if event != 'socket.connect' or getattr(args[0], 'family', None) in (2, 10, 30):\n"
-            "            with open(os.environ['DELPHI_NETWORK_LOG'], 'a') as stream:\n"
+            "            with open(os.environ['DELPHI_CODE_NETWORK_LOG'], 'a') as stream:\n"
             "                stream.write(event + '\\n')\n"
             "            raise RuntimeError('Network attempted during offline test')\n"
             "sys.addaudithook(audit)\n"
         )
         cls.network_log = cls.base / "network.log"
         cls.env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(cls.audit), str(ROOT)]),
-                       DELPHI_INDEX_ROOT=str(cls.index_root), HF_HOME=str(cls.base / "empty-hf-cache"), DELPHI_NETWORK_LOG=str(cls.network_log),
+                       DELPHI_CODE_INDEX_ROOT=str(cls.index_root), HF_HOME=str(cls.base / "empty-hf-cache"), DELPHI_CODE_NETWORK_LOG=str(cls.network_log),
                        COCOINDEX_DISABLE_USAGE_TRACKING="0", HF_HUB_OFFLINE="0", HF_HUB_DISABLE_TELEMETRY="0")
 
     @classmethod
@@ -44,7 +44,7 @@ class OfflineCLI(unittest.TestCase):
         cls.workspace.cleanup()
 
     def invoke(self, *args, code=0, model=MODEL, project=True):
-        command = [sys.executable, "-m", "delphi", *args]
+        command = [sys.executable, "-m", "delphi_code", *args]
         if project:
             command.extend(["--project", str(self.project)])
         if args[0] != "status":
@@ -59,7 +59,7 @@ class OfflineCLI(unittest.TestCase):
 
     def test_setup_import_and_reuse(self):
         destination = self.base / "provisioned-model"
-        command = [sys.executable, "-m", "delphi", "setup", "--from", MODEL, "--model", str(destination)]
+        command = [sys.executable, "-m", "delphi_code", "setup", "--from", MODEL, "--model", str(destination)]
         for reused in (False, True):
             result = subprocess.run(command, env=self.env, text=True, capture_output=True, timeout=120)
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
@@ -72,7 +72,7 @@ class OfflineCLI(unittest.TestCase):
     def test_workflow(self):
         missing = self.invoke("index", model=self.base / "missing", code=3)
         self.assertEqual(missing["code"], "model_missing")
-        self.assertFalse((self.project / ".delphi").exists())
+        self.assertFalse((self.project / ".delphi-code").exists())
         self.assertEqual(self.invoke("search", "password", code=4)["code"], "index_missing")
         doctor = self.invoke("doctor")
         self.assertEqual(doctor["dimensions"], 384)
@@ -91,7 +91,7 @@ class OfflineCLI(unittest.TestCase):
         initial = self.invoke("index")
         self.assertGreaterEqual(initial["files"], 3)
         self.assertEqual(initial["index_directory"], str(self.state))
-        self.assertFalse((self.project / ".delphi").exists())
+        self.assertFalse((self.project / ".delphi-code").exists())
         results = self.invoke("search", "verify user password", "--language", "python", "--limit", "1")["results"]
         self.assertEqual(results[0]["path"], "auth.py")
         across = self.invoke("search", "verify user password", "--limit", "1", project=False)
@@ -142,7 +142,7 @@ class OfflineCLI(unittest.TestCase):
 
 
 class NetworkSandbox(unittest.TestCase):
-    @unittest.skipUnless(os.environ.get("DELPHI_OS_SANDBOX") == "1", "Run via scripts/test_offline.sh")
+    @unittest.skipUnless(os.environ.get("DELPHI_CODE_OS_SANDBOX") == "1", "Run via scripts/test_offline.sh")
     def test_os_denies_network(self):
         probe = subprocess.run(
             [sys.executable, "-c",

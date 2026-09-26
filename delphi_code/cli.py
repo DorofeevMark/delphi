@@ -23,13 +23,13 @@ class Parser(argparse.ArgumentParser):
 
 
 def arguments():
-    parser = Parser(prog="delphi", description="Offline local code search")
+    parser = Parser(prog="delphi-code", description="Offline local code search")
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("index", "search", "status", "doctor"):
         command = commands.add_parser(name)
         command.add_argument("--project", "-p", default=None if name == "search" else str(Path.cwd()), help="Project path or indexed name; search defaults to all indexes")
         if name != "status":
-            command.add_argument("--model", default=os.environ.get("DELPHI_MODEL") or model_directory())
+            command.add_argument("--model", default=os.environ.get("DELPHI_CODE_MODEL") or model_directory())
         if name in {"index", "search"}:
             command.add_argument("--path", action="append", default=[], help="Project-relative glob; repeat for alternatives")
             command.add_argument("--language", action="append", default=[])
@@ -41,7 +41,7 @@ def arguments():
             command.add_argument("--limit", type=int, default=10)
     setup = commands.add_parser("setup", help="Download or import the pinned model and check the installation")
     setup.add_argument("--from", dest="source", help="Import a prepared MiniLM model without network access")
-    setup.add_argument("--model", default=os.environ.get("DELPHI_MODEL") or model_directory(), help="Model destination")
+    setup.add_argument("--model", default=os.environ.get("DELPHI_CODE_MODEL") or model_directory(), help="Model destination")
     return parser.parse_args()
 
 
@@ -139,7 +139,7 @@ def execute(args):
         raise Failure("project_missing", f"Project directory does not exist: {project}", 2)
     state = index_directory(project)
     if args.command in {"search", "status"} and not state.is_dir():
-        raise Failure("index_missing", f"No index exists; run delphi index -p {shlex.quote(str(project))}", 4)
+        raise Failure("index_missing", f"No index exists; run delphi-code index -p {shlex.quote(str(project))}", 4)
     if args.command == "status":
         with locked(state, False):
             info = metadata(state)
@@ -155,7 +155,7 @@ def execute(args):
 
         from .indexing import check_storage
 
-        with tempfile.TemporaryDirectory(prefix="delphi-doctor-") as scratch:
+        with tempfile.TemporaryDirectory(prefix="delphi-code-doctor-") as scratch:
             asyncio.run(check_storage(Path(scratch)))
         model = load_model(model_path)
         vector = embed(model, ["local code search"])[0]
@@ -230,7 +230,7 @@ def search_rows(state, args, vector):
 def search_all(args):
     states = sorted(path for path in index_root().glob("*") if path.is_dir())
     if not states:
-        raise Failure("index_missing", "No indexes exist; run delphi index -p /absolute/path/to/project first", 4)
+        raise Failure("index_missing", "No indexes exist; run delphi-code index -p /absolute/path/to/project first", 4)
     model_path, identity = inspect_model(args.model)
     if not hasattr(sqlite3.Connection, "enable_load_extension"):
         raise Failure("sqlite_extensions_unavailable", "This Python disables SQLite extension loading; provision a Python build with loadable SQLite extensions", 3)
@@ -266,7 +266,7 @@ def main():
             result = execute(args)
         payload = {"schema_version": 1, "ok": True, "command": command, "data": result}
     except Exception as exc:
-        if os.environ.get("DELPHI_DEBUG") == "1":
+        if os.environ.get("DELPHI_CODE_DEBUG") == "1":
             import traceback
 
             traceback.print_exc(file=sys.stderr)
@@ -275,7 +275,7 @@ def main():
             str(exc), 3 if isinstance(exc, ModuleNotFoundError) else 5,
         )
         exit_code = failure.exit_code
-        print(f"delphi: {failure}", file=sys.stderr)
+        print(f"delphi-code: {failure}", file=sys.stderr)
         payload = {"schema_version": 1, "ok": False, "command": command,
                    "error": {"code": failure.code, "message": str(failure)}}
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True, allow_nan=False))

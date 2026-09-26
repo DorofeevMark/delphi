@@ -10,8 +10,8 @@ from unittest.mock import patch
 import numpy as np
 import sqlite_vec
 
-from delphi.cli import arguments, execute, index_directory
-from delphi.model import Failure
+from delphi_code.cli import arguments, execute, index_directory
+from delphi_code.model import Failure
 
 
 class CrossProjectSearch(unittest.TestCase):
@@ -19,10 +19,10 @@ class CrossProjectSearch(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
-        self.enterContext(patch.dict(os.environ, {"DELPHI_INDEX_ROOT": str(self.root / "indexes")}))
-        self.enterContext(patch("delphi.cli.inspect_model", return_value=(self.root / "model", "same-model")))
-        self.enterContext(patch("delphi.cli.load_model"))
-        self.embedding = self.enterContext(patch("delphi.cli.embed", return_value=np.array([[1, 0]], dtype=np.float32)))
+        self.enterContext(patch.dict(os.environ, {"DELPHI_CODE_INDEX_ROOT": str(self.root / "indexes")}))
+        self.enterContext(patch("delphi_code.cli.inspect_model", return_value=(self.root / "model", "same-model")))
+        self.enterContext(patch("delphi_code.cli.load_model"))
+        self.embedding = self.enterContext(patch("delphi_code.cli.embed", return_value=np.array([[1, 0]], dtype=np.float32)))
 
     def register(self, name, rows, **updates):
         project = self.root / name
@@ -47,7 +47,7 @@ class CrossProjectSearch(unittest.TestCase):
         return project, state
 
     def search(self, *options):
-        with patch.object(sys, "argv", ["delphi", "search", "query", *options]):
+        with patch.object(sys, "argv", ["delphi-code", "search", "query", *options]):
             return execute(arguments())
 
     def test_global_ranking_limit_and_project_identity(self):

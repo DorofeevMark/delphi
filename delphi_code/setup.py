@@ -39,7 +39,7 @@ def download(destination):
         env=env, stdout=sys.stderr, stderr=sys.stderr,
     )
     if result.returncode:
-        raise Failure("setup_download_failed", "Model download failed; check connectivity and rerun delphi setup, or use delphi setup --from /path/to/model", 3)
+        raise Failure("setup_download_failed", "Model download failed; check connectivity and rerun delphi-code setup, or use delphi-code setup --from /path/to/model", 3)
 
 
 def diagnose(model):
@@ -70,7 +70,7 @@ def provision(args):
             try:
                 verify_assets(destination)
             except Failure as exc:
-                raise Failure(exc.code, f"{exc}. Existing assets were preserved. Move {destination} aside, then rerun delphi setup --model {shlex.quote(str(destination))}", 3) from exc
+                raise Failure(exc.code, f"{exc}. Existing assets were preserved. Move {destination} aside, then rerun delphi-code setup --model {shlex.quote(str(destination))}", 3) from exc
             diagnostics = diagnose(destination)
             reused = True
         else:

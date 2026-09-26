@@ -13,10 +13,10 @@ class Failure(Exception):
 
 def inspect_model(value):
     if not value:
-        raise Failure("model_missing", "Supply --model /absolute/local/model or DELPHI_MODEL")
+        raise Failure("model_missing", "Supply --model /absolute/local/model or DELPHI_CODE_MODEL")
     root = Path(value).expanduser().resolve()
     if not root.is_dir() or not (root / "modules.json").is_file():
-        raise Failure("model_missing", f"Local SentenceTransformers assets missing: {root}. Run delphi setup --model {shlex.quote(str(root))}, or set --model /local/model or DELPHI_MODEL to prepared assets; downloads are never automatic.")
+        raise Failure("model_missing", f"Local SentenceTransformers assets missing: {root}. Run delphi-code setup --model {shlex.quote(str(root))}, or set --model /local/model or DELPHI_CODE_MODEL to prepared assets; downloads are never automatic.")
     modules = json.loads((root / "modules.json").read_text())
     allowed = {"sentence_transformers.models.Transformer", "sentence_transformers.models.Pooling", "sentence_transformers.models.Normalize", "sentence_transformers.models.Dense"}
     if not isinstance(modules, list) or not modules:

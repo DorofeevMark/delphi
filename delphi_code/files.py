@@ -2,7 +2,7 @@ import fnmatch
 
 from pathspec import GitIgnoreSpec
 
-DEFAULT_EXCLUDES = {".git", ".delphi", ".venv", "venv", "node_modules", "__pycache__", ".models"}
+DEFAULT_EXCLUDES = {".git", ".delphi-code", ".venv", "venv", "node_modules", "__pycache__", ".models"}
 
 
 def selected(path, language, paths, languages):
@@ -21,7 +21,7 @@ def collect(root, paths, languages, ignores, model_root, max_bytes):
     def walk(directory, inherited):
         nonlocal skipped
         rules = list(inherited)
-        for name in (".gitignore", ".delphiignore"):
+        for name in (".gitignore", ".delphi-codeignore"):
             rule_file = directory / name
             if rule_file.is_file() and not rule_file.is_symlink():
                 rules.append((directory, GitIgnoreSpec.from_lines(rule_file.read_text().splitlines())))
