@@ -121,4 +121,4 @@ See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency/model proven
 
 The `Publish` GitHub Actions workflow builds and validates distributions on pushes to `main`. Version tags such as `v0.1.0` also publish after the macOS installation, online setup, and offline tests pass. The tag must match the version in `pyproject.toml`.
 
-Before the first release, configure a pending Trusted Publisher in your PyPI account: project `delphi-code`, owner `DorofeevMark`, repository `delphi`, workflow `publish.yml`, environment `pypi`. Then push the matching version tag. Publishing uses GitHub OIDC; no stored PyPI token is required.
+Before the first release, configure a pending Trusted Publisher in your PyPI account: project `delphi-code`, owner `DorofeevMark`, repository `delphi-code`, workflow `publish.yml`, environment `pypi`. Then push the matching version tag. Publishing uses GitHub OIDC; no stored PyPI token is required.
