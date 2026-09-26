@@ -4,6 +4,12 @@ import shlex
 from pathlib import Path
 
 
+def incidental(relative):
+    # Files that travel with the model but never affect embeddings: documentation, provenance,
+    # and dotfile metadata left by the OS or downloader (.DS_Store, ._*, .cache).
+    return relative.name in {"README.md", "LICENSE", "provenance.json"} or any(part.startswith(".") for part in relative.parts)
+
+
 class Failure(Exception):
     def __init__(self, code, message, exit_code=3):
         super().__init__(message)
@@ -32,7 +38,7 @@ def inspect_model(value):
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*")):
         relative = path.relative_to(root)
-        if ".cache" in relative.parts or path.name in {"README.md", "LICENSE", "provenance.json"}:
+        if incidental(relative):
             continue
         if path.is_file():
             digest.update(relative.as_posix().encode() + b"\0")

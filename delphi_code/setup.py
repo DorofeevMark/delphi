@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 
-from .model import Failure
+from .model import Failure, incidental
 from .paths import index_root
 
 
@@ -26,7 +26,7 @@ def verify_assets(root):
             raise Failure("model_invalid", f"Model asset checksum mismatch: {path}")
     allowed = set(manifest["sha256"]) | {"provenance.json"}
     for path in root.rglob("*"):
-        if ".cache" not in path.relative_to(root).parts and path.is_file() and path.relative_to(root).as_posix() not in allowed:
+        if not incidental(path.relative_to(root)) and path.is_file() and path.relative_to(root).as_posix() not in allowed:
             raise Failure("model_invalid", f"Unexpected model asset: {path}")
     return manifest
 
@@ -78,7 +78,7 @@ def provision(args):
                 staged = Path(temporary) / "model"
                 if source:
                     verify_assets(source)
-                    shutil.copytree(source, staged, ignore=shutil.ignore_patterns(".cache"))
+                    shutil.copytree(source, staged, ignore=shutil.ignore_patterns(".*"))
                 else:
                     staged.mkdir()
                     print("Downloading the pinned MiniLM model…", file=sys.stderr)

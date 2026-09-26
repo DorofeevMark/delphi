@@ -96,6 +96,13 @@ class Setup(unittest.TestCase):
         with self.assertRaises(Failure):
             verify_assets(self.source)
 
+    def test_os_metadata_accepted(self):
+        (self.source / ".DS_Store").write_bytes(b"finder")
+        verify_assets(self.source)
+        (self.source / "stray.bin").write_bytes(b"extra")
+        with self.assertRaisesRegex(Failure, "Unexpected model asset"):
+            verify_assets(self.source)
+
     def test_import_keeps_network_guard(self):
         with self.assertRaisesRegex(RuntimeError, "Offline policy"):
             socket.getaddrinfo("example.com", 443)
