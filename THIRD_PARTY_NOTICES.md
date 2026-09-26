@@ -1,6 +1,6 @@
 # Third-party notices and provenance
 
-Delphi Code's original application code uses the repository's Apache-2.0 license. Its Python package declares dependencies but does not bundle their code, a Python interpreter, or model weights. Dependencies and models retain their own licenses and notices in their separately installed distributions.
+Delphi Code's original application code uses the repository's Apache-2.0 license. It was implemented independently after inspecting a local reference implementation's behavior and library integration; no reference source, documentation, or branding is included. Its Python package declares dependencies but does not bundle their code, a Python interpreter, or model weights. Dependencies and models retain their own licenses and notices in their separately installed distributions.
 
 ## Dependencies
 
