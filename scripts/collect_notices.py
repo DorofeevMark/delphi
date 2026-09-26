@@ -9,7 +9,7 @@ root.mkdir(exist_ok=True)
 records = []
 for distribution in sorted(distributions(), key=lambda item: item.metadata["Name"].lower()):
     name = distribution.metadata["Name"]
-    if name == "delphi-local-code":
+    if name == "delphi":
         continue
     record = {
         "name": name, "version": distribution.version,
