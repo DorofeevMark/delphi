@@ -4,12 +4,12 @@ A small Python CLI for agents searching local source trees. It runs one command 
 
 ## Preparation
 
-The tested target is macOS arm64, with CPython 3.12 supporting SQLite loadable extensions. Some python.org macOS builds disable that feature. `doctor` reports this explicitly. The pinned NumPy and PyTorch wheels used here require macOS 14 or later. CPU inference is used.
+The tested target is macOS arm64, with CPython 3.12 supporting SQLite loadable extensions. Some python.org macOS builds disable that feature; `--managed-python` makes uv use its own Python build, which supports it. `doctor` reports this explicitly. The pinned NumPy and PyTorch wheels used here require macOS 14 or later. CPU inference is used.
 
 Install with:
 
 ```sh
-uv tool install --python 3.12 delphi-code
+uv tool install --python 3.12 --managed-python delphi-code
 delphi-code setup
 ```
 
@@ -25,7 +25,7 @@ python3.12 -m venv .venv
 With uv already installed, the shorter local installation is:
 
 ```sh
-uv tool install --python 3.12 /absolute/path/to/delphi-code
+uv tool install --python 3.12 --managed-python /absolute/path/to/delphi-code
 delphi-code setup
 delphi-code index -p /absolute/path/to/project
 delphi-code search 'where are user passwords checked?'

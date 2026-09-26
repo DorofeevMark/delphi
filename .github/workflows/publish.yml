@@ -51,7 +51,7 @@ jobs:
           path: dist
       - name: Install release wheel with dependencies
         run: |
-          uv venv .venv
+          uv venv --python 3.12 --managed-python .venv
           uv pip install dist/*.whl
       - name: Download and validate model
         env:
