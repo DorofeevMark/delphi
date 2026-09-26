@@ -16,6 +16,7 @@ dependencies = [
   "sentence-transformers==6.1.0",
   "numpy==2.5.3",
   "pathspec==0.12.1",
+  "certifi",
 ]
 
 [project.urls]

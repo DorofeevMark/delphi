@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import ssl
 import sys
 from urllib.request import urlopen
 
@@ -14,7 +15,10 @@ def main():
         allow_patterns=list(manifest["sha256"]),
     )
     if not (destination / "LICENSE").exists():
-        with urlopen("https://www.apache.org/licenses/LICENSE-2.0.txt", timeout=60) as response:
+        import certifi
+
+        context = ssl.create_default_context(cafile=certifi.where())
+        with urlopen("https://www.apache.org/licenses/LICENSE-2.0.txt", timeout=60, context=context) as response:
             (destination / "LICENSE").write_bytes(response.read())
 
 
