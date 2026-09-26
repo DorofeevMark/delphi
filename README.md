@@ -6,6 +6,13 @@ A small Python CLI for agents searching local source trees. It runs one command 
 
 The tested target is macOS arm64, with CPython 3.12 supporting SQLite loadable extensions. Some python.org macOS builds disable that feature. `doctor` reports this explicitly. The pinned NumPy and PyTorch wheels used here require macOS 14 or later. CPU inference is used.
 
+After the first PyPI release, install with:
+
+```sh
+uv tool install --python 3.12 delphi-code
+delphi-code setup
+```
+
 Install from this checkout with a Python 3.12 build that supports SQLite extensions:
 
 ```sh
@@ -109,3 +116,9 @@ Set `DELPHI_CODE_TEST_MODEL` to the actual model location; a model prepared insi
 The separate `tests/offline` suite launches real CLI subprocesses under OS network denial, uses an empty Hugging Face cache, and records Python DNS/connect attempts before runtime imports. It covers offline model import/reuse, missing models, doctor, actual retrieval, same-content reuse, preserved-mtime edits, deletion, ignore negation, filters, line numbers, empty results, and JSON/exit codes. A separate socket probe verifies the OS blocks networking. This directory is intentionally outside regular unittest discovery. Run both commands for the full 26-test check; neither suite tests live model downloads.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency/model provenance and redistribution notes. The application package does not bundle dependencies or model weights. For a bundled release, run `scripts/collect_notices.py` in the release environment and `scripts/prepare_notices.py` during online preparation to collect notices under `build/third_party/`; review and include them with that release. The model asset hashes are retained in `MODEL_PROVENANCE.json`.
+
+## Publishing
+
+The `Publish` GitHub Actions workflow builds and validates distributions on pushes to `main`. Version tags such as `v0.1.0` also publish after the macOS installation, online setup, and offline tests pass. The tag must match the version in `pyproject.toml`.
+
+Before the first release, configure a pending Trusted Publisher in your PyPI account: project `delphi-code`, owner `DorofeevMark`, repository `delphi`, workflow `publish.yml`, environment `pypi`. Then push the matching version tag. Publishing uses GitHub OIDC; no stored PyPI token is required.

@@ -18,6 +18,10 @@ dependencies = [
   "pathspec==0.12.1",
 ]
 
+[project.urls]
+Repository = "https://github.com/DorofeevMark/delphi"
+Issues = "https://github.com/DorofeevMark/delphi/issues"
+
 [project.scripts]
 delphi-code = "delphi_code.cli:main"
 

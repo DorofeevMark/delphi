@@ -1,0 +1,99 @@
+name: Publish
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check release version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+          version = tomllib.loads(Path('pyproject.toml').read_text())['project']['version']
+          assert os.environ['GITHUB_REF_NAME'] == f'v{version}', 'Tag must match package version'
+          PY
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/*
+          if-no-files-found: error
+
+  verify:
+    needs: build
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist
+      - name: Install release wheel with dependencies
+        run: |
+          uv venv .venv
+          uv pip install dist/*.whl
+      - name: Download and validate model
+        env:
+          DELPHI_CODE_MODEL: ${{ runner.temp }}/delphi-code-model
+          DELPHI_CODE_INDEX_ROOT: ${{ runner.temp }}/delphi-code-indexes
+        run: .venv/bin/delphi-code setup
+      - name: Run unit and offline integration tests
+        env:
+          DELPHI_CODE_TEST_MODEL: ${{ runner.temp }}/delphi-code-model
+        run: |
+          bash scripts/test.sh
+          bash scripts/test_offline.sh
+      - name: Verify installed package outside checkout
+        env:
+          DELPHI_CODE_MODEL: ${{ runner.temp }}/delphi-code-model
+          DELPHI_CODE_INDEX_ROOT: ${{ runner.temp }}/delphi-code-smoke-indexes
+        run: |
+          executable="$GITHUB_WORKSPACE/.venv/bin/delphi-code"
+          cd "$RUNNER_TEMP"
+          mkdir smoke-project
+          echo 'def authenticate_user(password, expected): return password == expected' > smoke-project/auth.py
+          "$executable" index -p "$RUNNER_TEMP/smoke-project"
+          "$executable" search -p "$RUNNER_TEMP/smoke-project" 'verify password' --limit 1 > search.json
+          "$GITHUB_WORKSPACE/.venv/bin/python" - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path('search.json').read_text())
+          assert result['ok'] and result['data']['results'][0]['path'] == 'auth.py'
+          PY
+
+  publish:
+    needs: [build, verify]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/delphi-code/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
