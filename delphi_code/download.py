@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 import ssl
 import sys
@@ -7,6 +8,9 @@ from urllib.request import urlopen
 
 def main():
     from huggingface_hub import snapshot_download
+
+    # The Hub nags anonymous clients to set HF_TOKEN; the pinned public model needs none.
+    logging.getLogger("huggingface_hub.utils._http").addFilter(lambda record: "HF_TOKEN" not in record.getMessage())
 
     manifest = json.loads(Path(__file__).with_name("model_provenance.json").read_text())
     destination = Path(sys.argv[1])
