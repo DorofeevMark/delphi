@@ -5,13 +5,14 @@ import unittest
 from unittest.mock import patch
 
 from delphi.cli import index_directory, locked
+from delphi.paths import data_directory
 
 
 class IndexDirectory(unittest.TestCase):
-    def test_default_is_inside_delphi(self):
+    def test_default_is_user_data(self):
         with patch.dict(os.environ, {}, clear=True):
             state = index_directory(Path('/tmp/example'))
-        self.assertEqual(state.parent, Path(__file__).resolve().parents[1] / '.delphi/indexes')
+        self.assertEqual(state.parent, data_directory() / 'indexes')
 
     def test_projects_with_same_name_are_separate(self):
         with tempfile.TemporaryDirectory() as temporary:

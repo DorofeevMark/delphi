@@ -23,3 +23,6 @@ delphi = "delphi.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["delphi*"]
+
+[tool.setuptools.package-data]
+delphi = ["model_provenance.json"]

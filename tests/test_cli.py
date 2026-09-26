@@ -57,6 +57,18 @@ class OfflineCLI(unittest.TestCase):
         self.assertFalse(self.network_log.exists(), self.network_log.read_text() if self.network_log.exists() else "")
         return payload.get("data", payload.get("error"))
 
+    def test_setup_import_and_reuse(self):
+        destination = self.base / "provisioned-model"
+        command = [sys.executable, "-m", "delphi", "setup", "--from", MODEL, "--model", str(destination)]
+        for reused in (False, True):
+            result = subprocess.run(command, env=self.env, text=True, capture_output=True, timeout=120)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["data"]["reused"], reused)
+            self.assertEqual(payload["data"]["diagnostics"]["dimensions"], 384)
+            self.assertEqual(payload["data"]["diagnostics"]["model"], str(destination))
+            self.assertFalse(self.network_log.exists())
+
     def test_workflow(self):
         missing = self.invoke("index", model=self.base / "missing", code=3)
         self.assertEqual(missing["code"], "model_missing")

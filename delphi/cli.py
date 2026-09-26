@@ -7,12 +7,14 @@ from importlib.metadata import version
 import json
 import os
 from pathlib import Path
+import shlex
 import sqlite3
 import sys
 import tempfile
 from datetime import datetime, timezone
 
-from .model import Failure, default_model, embed, inspect_model, load_model
+from .model import Failure, embed, inspect_model, load_model
+from .paths import index_root, model_directory
 
 
 class Parser(argparse.ArgumentParser):
@@ -27,7 +29,7 @@ def arguments():
         command = commands.add_parser(name)
         command.add_argument("--project", "-p", default=None if name == "search" else str(Path.cwd()), help="Project path or indexed name; search defaults to all indexes")
         if name != "status":
-            command.add_argument("--model", default=os.environ.get("DELPHI_MODEL") or default_model())
+            command.add_argument("--model", default=os.environ.get("DELPHI_MODEL") or model_directory())
         if name in {"index", "search"}:
             command.add_argument("--path", action="append", default=[], help="Project-relative glob; repeat for alternatives")
             command.add_argument("--language", action="append", default=[])
@@ -37,14 +39,10 @@ def arguments():
         if name == "search":
             command.add_argument("query")
             command.add_argument("--limit", type=int, default=10)
+    setup = commands.add_parser("setup", help="Download or import the pinned model and check the installation")
+    setup.add_argument("--from", dest="source", help="Import a prepared MiniLM model without network access")
+    setup.add_argument("--model", default=os.environ.get("DELPHI_MODEL") or model_directory(), help="Model destination")
     return parser.parse_args()
-
-
-def index_root():
-    root = Path(__file__).resolve().parent.parent
-    if root.name in {"site-packages", "dist-packages"}:
-        root = Path(sys.prefix).resolve().parent
-    return Path(os.environ.get("DELPHI_INDEX_ROOT") or root / ".delphi/indexes").expanduser().resolve()
 
 
 def index_directory(project):
@@ -128,6 +126,10 @@ def counts(state):
 
 
 def execute(args):
+    if args.command == "setup":
+        from .setup import provision
+
+        return provision(args)
     if args.command == "search" and (not args.query.strip() or not 1 <= args.limit <= 1000):
         raise Failure("usage", "Query must be nonempty and --limit must be between 1 and 1000", 2)
     if args.command == "search" and args.project is None:
@@ -136,6 +138,8 @@ def execute(args):
     if not project.is_dir():
         raise Failure("project_missing", f"Project directory does not exist: {project}", 2)
     state = index_directory(project)
+    if args.command in {"search", "status"} and not state.is_dir():
+        raise Failure("index_missing", f"No index exists; run delphi index -p {shlex.quote(str(project))}", 4)
     if args.command == "status":
         with locked(state, False):
             info = metadata(state)
@@ -226,7 +230,7 @@ def search_rows(state, args, vector):
 def search_all(args):
     states = sorted(path for path in index_root().glob("*") if path.is_dir())
     if not states:
-        raise Failure("index_missing", "No indexes exist; run index --project /path/to/code first", 4)
+        raise Failure("index_missing", "No indexes exist; run delphi index -p /absolute/path/to/project first", 4)
     model_path, identity = inspect_model(args.model)
     if not hasattr(sqlite3.Connection, "enable_load_extension"):
         raise Failure("sqlite_extensions_unavailable", "This Python disables SQLite extension loading; provision a Python build with loadable SQLite extensions", 3)
