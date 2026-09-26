@@ -10,6 +10,18 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+authors = [{ name = "Mark Dorofeev" }]
+keywords = ["code-search", "semantic-search", "embeddings", "offline", "cli", "agents"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development",
+  "Topic :: Text Processing :: Indexing",
+]
 dependencies = [
   "cocoindex==1.0.24",
   "sqlite-vec==0.1.9",

@@ -6,7 +6,7 @@ A small Python CLI for agents searching local source trees. It runs one command 
 
 The tested target is macOS arm64, with CPython 3.12 supporting SQLite loadable extensions. Some python.org macOS builds disable that feature. `doctor` reports this explicitly. The pinned NumPy and PyTorch wheels used here require macOS 14 or later. CPU inference is used.
 
-After the first PyPI release, install with:
+Install with:
 
 ```sh
 uv tool install --python 3.12 delphi-code
@@ -31,7 +31,7 @@ delphi-code index -p /absolute/path/to/project
 delphi-code search 'where are user passwords checked?'
 ```
 
-The package is not yet published; install from the checkout or a built wheel. The pinned dependency freeze records the tested macOS environment, not a cross-platform lock. Linux has not yet been verified; Windows is not supported by the current file locking implementation.
+The pinned dependency freeze records the tested macOS environment, not a cross-platform lock. Linux has not yet been verified; Windows is not supported by the current file locking implementation.
 
 `setup` explicitly downloads the pinned MiniLM revision in a separate provisioning process. It validates every expected file against bundled SHA-256 hashes, then runs local embedding, SQLite, and native-storage diagnostics before publishing the model directory. Repeated setup verifies and reuses valid assets. Concurrent setup for the same destination fails clearly. Failed downloads or diagnostics leave no published partial model; invalid existing models are preserved with recovery instructions.
 
@@ -78,7 +78,7 @@ A Python audit guard rejects Internet socket operations and DNS resolution. For 
   .venv/bin/python -m delphi_code index --project /path/to/project
 ```
 
-The audit guard is defense in depth, not a replacement for OS isolation. In this session, Codex’s own filesystem sandbox denied CocoIndex native storage initialization with `EPERM`; the dedicated macOS profile above successfully ran indexing with all networking denied. `doctor` probes native storage and reports `sandbox_storage_denied` for the stricter environment. Launching that dedicated profile from Codex requires its tool approval; the application does not escalate itself. The CLI uses local filesystem access, threads, SQLite extensions, and CocoIndex's LMDB memory maps. It needs read access to source and model files and write access to Delphi Code's user index directory. No network permission is needed. `doctor` probes CocoIndex storage, then runs an actual local embedding and sqlite-vec distance calculation; it reports the Python guard, not a claim that an external OS sandbox is active.
+The audit guard is defense in depth, not a replacement for OS isolation. Some stricter sandboxes deny CocoIndex native storage initialization with `EPERM`; the macOS profile above runs indexing with all networking denied. `doctor` probes native storage and reports `sandbox_storage_denied` in such environments. The application never escalates its own permissions. The CLI uses local filesystem access, threads, SQLite extensions, and CocoIndex's LMDB memory maps. It needs read access to source and model files and write access to Delphi Code's user index directory. No network permission is needed. `doctor` probes CocoIndex storage, then runs an actual local embedding and sqlite-vec distance calculation; it reports the Python guard, not a claim that an external OS sandbox is active.
 
 ## Indexing and filters
 
